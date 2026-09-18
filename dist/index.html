@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1A1A1A">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Manager</title>
+  <script type="module" crossorigin src="/assets/app-kKUuFrom.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/app-BdosayIn.css">
+</head>
+
+<body>
+  <main class="app">
+    <h1>Task Manager</h1>
+    <p class="subtitle">Base project – PWA elective, blocks 1 & 2 wrap‑up.</p>
+
+    <form id="task-form" class="task-form">
+      <input type="text" id="title-input" placeholder="New task…" required>
+      <select id="priority-select">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+      </select>
+      <button type="submit">Add</button>
+    </form>
+
+    <ul id="task-list" class="task-list"></ul>
+  </main>
+
+</body>
+</html>
