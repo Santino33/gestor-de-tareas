@@ -32,7 +32,7 @@ h1 {
 }
 
 .subtitle {
-  color: #777;
+  color: #595959;
   font-size: 0.85em;
   margin: 0 0 1.4em;
 }
@@ -109,7 +109,7 @@ h1 {
 
 .task--completed span {
   text-decoration: line-through;
-  color: #999;
+    color: #595959;
 }
 
 .delete-button {
@@ -128,7 +128,9 @@ h1 {
 
 [hidden] { display: none !important; }
 
-#message:not(:empty) { color: var(--danger); margin: 0 0 1em; }
+#message:not(:empty) { margin: 0 0 1em; }
+#message[data-state="error"] { color: var(--danger); }
+#message[data-state="success"] { color: #216039; }
 
 .password-form label, .note-label { flex: 1 1 100%; }
 .task-form textarea { flex: 1 1 100%; min-height: 75px; resize: vertical; font: inherit; }
@@ -136,3 +138,11 @@ h1 {
 
 .note-button { border: 1px solid var(--line); background: #fff8db; border-radius: 6px; padding: .3em .6em; cursor: pointer; }
 .private-note { flex: 1 1 100%; order: 1; margin: 0; padding: .5em; background: #f4f1e8; white-space: pre-wrap; overflow-wrap: anywhere; }
+button, select { min-height: 44px; }
+button:disabled { opacity: .6; cursor: wait; }
+:focus-visible { outline: 3px solid #315fa3; outline-offset: 3px; }
+.task-form label { flex-basis: 100%; }
+.task-filters { margin-bottom: 1rem; }
+.task-filters p, #install-help, #connectivity, #pwa-status { font-size: .85rem; }
+.task span { overflow-wrap: anywhere; min-width: 0; }
+@media (max-width: 600px) { .app { margin: 1rem .5rem; padding: 1rem; } }

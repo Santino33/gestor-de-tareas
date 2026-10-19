@@ -31,6 +31,6 @@ test('precache completo permite primera recarga offline y dos rutas runtime real
   await expect(page.locator('.private-note')).toHaveText('Secreto offline');
   await page.getByRole('checkbox').check();
   await expect(page.locator('.task')).toHaveClass(/task--completed/);
-  await page.getByRole('button', { name: 'Eliminar', exact: true }).click();
+  await page.getByRole('button', { name: 'Eliminar Tarea offline', exact: true }).click();
   await expect(page.locator('.task')).toHaveCount(0);
 });

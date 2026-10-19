@@ -2,17 +2,8 @@ import type { Priority } from "../models/Task";
 import { TaskService } from "../services/TaskService";
 import { TaskListView } from "./TaskListView";
 
-const DEFAULT_PRIORITY: Priority = "medium";
-
 function parsePriority(value: string): Priority {
-  switch (value) {
-    case "low":
-    case "medium":
-    case "high":
-      return value;
-    default:
-      return DEFAULT_PRIORITY;
-  }
+  return value === "low" || value === "high" ? value : "medium";
 }
 
 export class TaskView {
@@ -25,41 +16,33 @@ export class TaskView {
   private readonly titleInput = document.querySelector<HTMLInputElement>("#title-input")!;
   private readonly noteInput = document.querySelector<HTMLTextAreaElement>("#note-input")!;
   private readonly prioritySelect = document.querySelector<HTMLSelectElement>("#priority-select")!;
+  private readonly filter = document.querySelector<HTMLSelectElement>("#priority-filter")!;
+  private readonly complete = document.querySelector<HTMLButtonElement>("#complete-priority")!;
   private readonly taskListView = new TaskListView(document.querySelector<HTMLUListElement>("#task-list")!);
   private creatingPassword = false;
+  private busy = false;
 
   constructor(private readonly taskService: TaskService) {}
 
   async initialize(): Promise<void> {
-    const filter = document.querySelector<HTMLSelectElement>("#priority-filter")!;
-    const complete = document.querySelector<HTMLButtonElement>("#complete-priority")!;
-    filter.addEventListener("change", async () => {
-      filter.disabled = true;
-      complete.disabled = true;
-      try {
-        await this.taskService.filterTasks(filter.value ? parsePriority(filter.value) : undefined);
-        this.renderTasks();
-      } catch (error) { this.showError(error); }
-      finally { filter.disabled = false; complete.disabled = !filter.value; }
+    this.passwordForm.addEventListener("submit", event => { event.preventDefault(); void this.handlePassword(); });
+    this.form.addEventListener("submit", event => { event.preventDefault(); void this.handleSubmit(); });
+    this.filter.addEventListener("change", () => {
+      void this.run("Cargando tareas…", "Filtro aplicado.", async () => {
+        await this.taskService.filterTasks(this.filter.value ? parsePriority(this.filter.value) : undefined);
+      });
     });
-    complete.addEventListener("click", async () => {
-      complete.disabled = true;
-      filter.disabled = true;
-      try {
-        const count = await this.taskService.completePriority(parsePriority(filter.value));
-        this.message.textContent = `${count} tareas completadas.`;
-        this.renderTasks();
-      } catch (error) { this.showError(error); }
-      finally { complete.disabled = !filter.value; filter.disabled = false; }
+    this.complete.addEventListener("click", () => {
+      void this.run("Completando prioridad…", "Prioridad completada.", async () => {
+        await this.taskService.completePriority(parsePriority(this.filter.value));
+      });
     });
-    this.passwordForm.addEventListener("submit", (event) => { void this.handlePassword(event); });
-    this.form.addEventListener("submit", (event) => { void this.handleSubmit(event); });
     try {
       const hasPassword = await this.taskService.hasPassword();
       this.creatingPassword = !hasPassword;
       document.querySelector("#password-label")!.textContent = hasPassword
         ? "Ingresa tu contraseña para desbloquear las notas"
-        : "Crea una contraseña para cifrar tus notas privadas";
+        : "Crea una contraseña de al menos 12 caracteres. Si la pierdes, no podrás recuperar las notas.";
       document.querySelector("#password-submit")!.textContent = hasPassword ? "Desbloquear" : "Crear contraseña";
       this.passwordInput.autocomplete = hasPassword ? "current-password" : "new-password";
       this.passwordInput.minLength = hasPassword ? 1 : 12;
@@ -68,77 +51,68 @@ export class TaskView {
       this.passwordConfirm.required = !hasPassword;
       this.passwordConfirm.minLength = 12;
       this.passwordForm.hidden = false;
-    } catch (error) {
-      this.showError(error);
+      this.message.textContent = "";
+    } catch (error) { this.showError(error); }
+  }
+
+  private setBusy(value: boolean): void {
+    this.busy = value;
+    this.taskSection.setAttribute("aria-busy", String(value));
+    this.passwordForm.setAttribute("aria-busy", String(value));
+    document.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>(
+      '#task-section input, #task-section button, #task-section select, #task-section textarea, #password-form input, #password-form button',
+    ).forEach(control => { control.disabled = value; });
+    this.complete.disabled = value || !this.filter.value;
+  }
+
+  private async run(loading: string, success: string, operation: () => Promise<void>): Promise<void> {
+    if (this.busy) return;
+    this.setBusy(true);
+    this.message.dataset.state = "loading";
+    this.message.textContent = loading;
+    try {
+      await operation();
+      this.message.dataset.state = "success";
+      this.message.textContent = success;
+    } catch (error) { this.showError(error); }
+    finally {
+      this.renderTasks();
+      this.setBusy(false);
     }
   }
 
-  private async handlePassword(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
-    const button = this.passwordForm.querySelector<HTMLButtonElement>("button")!;
-    button.disabled = true;
-    this.message.textContent = "";
-    try {
-      if (this.creatingPassword && this.passwordInput.value !== this.passwordConfirm.value) {
-        throw new Error("Las contraseñas no coinciden");
-      }
+  private async handlePassword(): Promise<void> {
+    await this.run("Derivando clave y cargando tareas…", "Notas desbloqueadas.", async () => {
+      if (this.creatingPassword && this.passwordInput.value !== this.passwordConfirm.value) throw new Error("Las contraseñas no coinciden");
       await this.taskService.unlock(this.passwordInput.value);
       this.passwordInput.value = "";
       this.passwordConfirm.value = "";
       this.passwordForm.hidden = true;
       this.taskSection.hidden = false;
-      this.renderTasks();
-    } catch (error) {
-      this.showError(error);
-    } finally {
-      button.disabled = false;
-    }
+    });
+    if (!this.taskSection.hidden) this.titleInput.focus();
   }
 
-  private async handleSubmit(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
+  private async handleSubmit(): Promise<void> {
     const title = this.titleInput.value.trim();
-    if (!title) return;
-    const button = this.form.querySelector<HTMLButtonElement>("button")!;
-    button.disabled = true;
-    try {
+    if (!title) { this.showError(new Error("Escribe un título.")); return; }
+    await this.run("Cifrando y guardando tarea…", "Tarea guardada.", async () => {
       await this.taskService.createTask(title, parsePriority(this.prioritySelect.value), this.noteInput.value);
       this.form.reset();
-      this.message.textContent = "";
-      this.renderTasks();
-    } catch (error) {
-      this.showError(error);
-    } finally {
-      button.disabled = false;
-    }
+    });
+    this.titleInput.focus();
   }
 
   private renderTasks(): void {
     this.taskListView.render(this.taskService.getTasks(), {
-      onToggle: async (id) => {
-        try {
-          await this.taskService.toggleTask(id);
-          this.message.textContent = "";
-          this.renderTasks();
-        } catch (error) {
-          this.showError(error);
-          this.renderTasks();
-        }
-      },
-      onDelete: async (id) => {
-        try {
-          await this.taskService.deleteTask(id);
-          this.message.textContent = "";
-          this.renderTasks();
-        } catch (error) {
-          this.showError(error);
-        }
-      },
-      onReadNote: (id) => this.taskService.readNote(id),
+      onToggle: id => this.run("Guardando estado…", "Estado guardado.", () => this.taskService.toggleTask(id)),
+      onDelete: id => this.run("Eliminando tarea…", "Tarea eliminada.", () => this.taskService.deleteTask(id)),
+      onReadNote: id => this.taskService.readNote(id),
     });
   }
 
   showError(error: unknown): void {
+    this.message.dataset.state = "error";
     this.message.textContent = error instanceof Error ? error.message : "Ocurrió un error de almacenamiento";
   }
 }

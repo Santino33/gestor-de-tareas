@@ -6,6 +6,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestor de tareas</title>
+  <meta name="description" content="Organiza tareas por prioridad y guarda notas privadas cifradas en tu dispositivo, incluso sin conexión.">
+  <link rel="icon" href="/icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 
@@ -13,6 +16,13 @@
   <main class="app">
     <h1>Gestor de tareas</h1>
     <p class="subtitle">Tus tareas y notas privadas, incluso sin conexión.</p>
+    <aside aria-label="Estado de la aplicación">
+      <p id="connectivity" role="status"></p>
+      <button type="button" id="install" hidden>Instalar aplicación</button>
+      <p id="install-help">Para instalar, busca «Instalar» en el menú del navegador. En iPhone/iPad: Compartir → Añadir a pantalla de inicio, si está disponible.</p>
+      <p id="pwa-status" role="status"></p>
+      <button type="button" id="update" hidden>Actualizar aplicación</button>
+    </aside>
 
     <form id="password-form" class="password-form" hidden>
       <label for="password-input" id="password-label">Contraseña de las notas privadas</label>
@@ -21,11 +31,13 @@
       <input type="password" id="password-confirm" autocomplete="new-password" hidden>
       <button type="submit" id="password-submit">Desbloquear</button>
     </form>
-    <p id="message" role="status" aria-live="polite"></p>
+    <p id="message" role="status" aria-live="polite">Abriendo almacenamiento…</p>
 
     <section id="task-section" hidden>
     <form id="task-form" class="task-form">
+      <label for="title-input">Título</label>
       <input type="text" id="title-input" placeholder="Nueva tarea…" required>
+      <label for="priority-select">Prioridad</label>
       <select id="priority-select">
         <option value="low">Baja</option>
         <option value="medium" selected>Media</option>
