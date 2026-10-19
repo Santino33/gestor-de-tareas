@@ -14,6 +14,8 @@ test('precache completo permite primera recarga offline y dos rutas runtime real
     const navigation = await caches.keys();
     return (await manifest.keys()).length > 0 && (await pages.keys()).length > 0 && navigation.some(key => key.includes('precache'));
   })).toBe(true);
+  // Fuerza la reserva precargada, sin depender del HTML cacheado en runtime.
+  await page.evaluate(() => caches.delete('gestor-navigation'));
   await context.setOffline(true);
   await page.reload();
   await expect(page.locator('#password-form')).toBeVisible();
@@ -24,7 +26,29 @@ test('precache completo permite primera recarga offline y dos rutas runtime real
   await page.locator('#note-input').fill('Secreto offline');
   await page.getByRole('button', { name: 'Agregar', exact: true }).click();
   await expect(page.locator('#task-list')).toContainText('Tarea offline');
+  const stored = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('gestor-tareas-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const result = await new Promise<any>((resolve, reject) => {
+      const request = db.transaction('tareas').objectStore('tareas').getAll();
+      request.onsuccess = () => resolve(request.result[0]);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return { keys: Object.keys(result), encrypted: result.noteCiphertext instanceof ArrayBuffer, ivLength: result.noteIv.length, title: result.title, priority: result.priority };
+  });
+  expect(stored.encrypted).toBe(true);
+  expect(stored.ivLength).toBe(12);
+  expect(stored.keys).not.toContain('privateNote');
+  expect(stored.title).toBe('Tarea offline');
+  expect(stored.priority).toBe('medium');
   await page.reload();
+  await page.locator('#password-input').fill('contraseña equivocada');
+  await page.locator('#password-submit').click();
+  await expect(page.locator('#message')).toContainText('incorrecta');
   await page.locator('#password-input').fill('contraseña offline');
   await page.locator('#password-submit').click();
   await page.getByRole('button', { name: 'Ver nota', exact: true }).click();
