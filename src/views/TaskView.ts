@@ -31,6 +31,27 @@ export class TaskView {
   constructor(private readonly taskService: TaskService) {}
 
   async initialize(): Promise<void> {
+    const filter = document.querySelector<HTMLSelectElement>("#priority-filter")!;
+    const complete = document.querySelector<HTMLButtonElement>("#complete-priority")!;
+    filter.addEventListener("change", async () => {
+      filter.disabled = true;
+      complete.disabled = true;
+      try {
+        await this.taskService.filterTasks(filter.value ? parsePriority(filter.value) : undefined);
+        this.renderTasks();
+      } catch (error) { this.showError(error); }
+      finally { filter.disabled = false; complete.disabled = !filter.value; }
+    });
+    complete.addEventListener("click", async () => {
+      complete.disabled = true;
+      filter.disabled = true;
+      try {
+        const count = await this.taskService.completePriority(parsePriority(filter.value));
+        this.message.textContent = `${count} tareas completadas.`;
+        this.renderTasks();
+      } catch (error) { this.showError(error); }
+      finally { complete.disabled = !filter.value; filter.disabled = false; }
+    });
     this.passwordForm.addEventListener("submit", (event) => { void this.handlePassword(event); });
     this.form.addEventListener("submit", (event) => { void this.handleSubmit(event); });
     try {

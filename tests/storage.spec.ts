@@ -51,3 +51,20 @@ test('actualiza v1 sin perder tareas y una petición exitosa no confirma una tra
   expect(await requestResult(db.transaction('tareas').objectStore('tareas').get('v1'))).toBeTruthy();
   db.close();
 });
+
+test('CRUD, índices y cursor actualizan solo la prioridad seleccionada', async () => {
+  const storage = await TaskStorage.open();
+  for (const [id, priority, createdAt] of [['b', 'high', '2026-02-01'], ['a', 'low', '2026-01-01'], ['c', 'high', '2026-03-01']] as const) {
+    await storage.agregarTarea({ id, priority, createdAt, title: id, completed: false });
+  }
+  expect((await storage.getTasks()).map(t => t.id)).toEqual(['a', 'b', 'c']);
+  expect((await storage.getTasks('high')).map(t => t.id)).toEqual(['b', 'c']);
+  expect(await storage.completePriority('high')).toBe(2);
+  expect(await storage.completePriority('high')).toBe(0);
+  expect((await storage.obtenerTarea('a'))?.completed).toBe(false);
+  expect((await storage.obtenerTarea('b'))?.completed).toBe(true);
+  await expect(storage.agregarTarea((await storage.obtenerTarea('b'))!)).rejects.toThrow();
+  await storage.eliminarTarea('c');
+  expect(await storage.obtenerTarea('c')).toBeUndefined();
+  storage.close();
+});

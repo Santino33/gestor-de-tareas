@@ -36,6 +36,17 @@
       <button type="submit">Agregar</button>
     </form>
 
+    <div class="task-filters">
+      <label for="priority-filter">Filtrar por prioridad</label>
+      <select id="priority-filter">
+        <option value="">Todas</option>
+        <option value="low">Baja</option>
+        <option value="medium">Media</option>
+        <option value="high">Alta</option>
+      </select>
+      <button id="complete-priority" type="button" disabled>Completar esta prioridad</button>
+      <p>Ordenadas por fecha de creación, de más antigua a más reciente.</p>
+    </div>
     <ul id="task-list" class="task-list"></ul>
     </section>
   </main>

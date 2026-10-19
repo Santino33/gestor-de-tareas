@@ -4,6 +4,7 @@ import { NoteCrypto } from "./NoteCrypto";
 
 export class TaskService {
   private tasks: Task[] = [];
+  private priority?: Task["priority"];
   private readonly notes = new NoteCrypto();
 
   constructor(private readonly storage: TaskStorage) {}
@@ -22,7 +23,7 @@ export class TaskService {
     }
     await this.notes.unlock(password, config);
     await this.storage.importLegacyTasks();
-    this.tasks = await this.storage.getTasks();
+    await this.loadTasks();
   }
 
   async createTask(title: string, priority: Task["priority"], privateNote: string): Promise<void> {
@@ -34,31 +35,47 @@ export class TaskService {
       createdAt: new Date().toISOString(),
       ...(encrypted && { noteCiphertext: encrypted.ciphertext, noteIv: encrypted.iv }),
     };
-    await this.storage.addTask(task);
-    this.tasks.push(task);
+    await this.storage.agregarTarea(task);
+    await this.loadTasks();
   }
 
   async toggleTask(id: string): Promise<void> {
-    const task = this.tasks.find((item) => item.id === id);
+    const task = await this.storage.obtenerTarea(id);
     if (!task) throw new Error("Tarea no encontrada");
     const updated = { ...task, completed: !task.completed };
     await this.storage.updateTask(updated);
-    this.tasks = this.tasks.map((item) => item.id === id ? updated : item);
+    await this.loadTasks();
   }
 
   async deleteTask(id: string): Promise<void> {
     if (!this.tasks.some((task) => task.id === id)) throw new Error("Tarea no encontrada");
-    await this.storage.deleteTask(id);
+    await this.storage.eliminarTarea(id);
     this.tasks = this.tasks.filter((task) => task.id !== id);
   }
 
   async readNote(id: string): Promise<string> {
-    const task = this.tasks.find((item) => item.id === id);
+    const task = await this.storage.obtenerTarea(id);
     if (!task?.noteCiphertext || !task.noteIv) throw new Error("Esta tarea no tiene nota privada");
     return this.notes.decryptNote(task.noteCiphertext, task.noteIv);
   }
 
   getTasks(): Task[] {
     return [...this.tasks];
+  }
+
+  async loadTasks(priority = this.priority): Promise<void> {
+    this.priority = priority;
+    this.tasks = await this.storage.getTasks(priority);
+  }
+
+  async filterTasks(priority?: Task["priority"]): Promise<void> {
+    this.priority = priority;
+    await this.loadTasks();
+  }
+
+  async completePriority(priority: Task["priority"]): Promise<number> {
+    const count = await this.storage.completePriority(priority);
+    await this.loadTasks();
+    return count;
   }
 }

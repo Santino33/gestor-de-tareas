@@ -1,4 +1,4 @@
-import type { EncryptionConfig, Task } from "../models/Task";
+import type { EncryptionConfig, Priority, Task } from "../models/Task";
 
 const DB_NAME = "gestor-tareas-db";
 const LEGACY_KEY = "electiva-pwa-tareas";
@@ -72,11 +72,44 @@ export class TaskStorage {
     });
   }
 
-  getTasks(): Promise<Task[]> {
-    return requestInTransaction(this.db, "tareas", "readonly", (store) => store.index("porFecha").getAll());
+  async getTasks(priority?: Priority): Promise<Task[]> {
+    const tasks = await requestInTransaction<Task[]>(this.db, "tareas", "readonly", (store) =>
+      priority ? store.index("porPrioridad").getAll(priority) : store.index("porFecha").getAll());
+    return tasks.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
   }
 
-  addTask(task: Task): Promise<IDBValidKey> {
+  obtenerTarea(id: string): Promise<Task | undefined> {
+    return requestInTransaction(this.db, "tareas", "readonly", (store) => store.get(id));
+  }
+
+  async completePriority(priority: Priority): Promise<number> {
+    const tx = this.db.transaction("tareas", "readwrite");
+    const done = transactionDone(tx);
+    const traversal = new Promise<number>((resolve, reject) => {
+      let count = 0;
+      const request = tx.objectStore("tareas").index("porPrioridad").openCursor(priority);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) { resolve(count); return; }
+        if (cursor.value.completed) { cursor.continue(); return; }
+        void requestResult(cursor.update({ ...cursor.value, completed: true })).then(() => {
+          count++;
+          cursor.continue();
+        }).catch(reject);
+      };
+    });
+    try {
+      const [count] = await Promise.all([traversal, done]);
+      return count;
+    } catch (error) {
+      try { tx.abort(); } catch { /* Ya finalizada. */ }
+      await done.catch(() => undefined);
+      throw error;
+    }
+  }
+
+  agregarTarea(task: Task): Promise<IDBValidKey> {
     return requestInTransaction(this.db, "tareas", "readwrite", (store) => store.add(task));
   }
 
@@ -84,7 +117,7 @@ export class TaskStorage {
     return requestInTransaction(this.db, "tareas", "readwrite", (store) => store.put(task));
   }
 
-  deleteTask(id: string): Promise<undefined> {
+  eliminarTarea(id: string): Promise<undefined> {
     return requestInTransaction(this.db, "tareas", "readwrite", (store) => store.delete(id));
   }
 
