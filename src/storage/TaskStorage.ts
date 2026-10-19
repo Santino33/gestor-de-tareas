@@ -3,30 +3,48 @@ import type { EncryptionConfig, Task } from "../models/Task";
 const DB_NAME = "gestor-tareas-db";
 const LEGACY_KEY = "electiva-pwa-tareas";
 
-// Las promesas de escritura esperan a que termine la transacción, no solo la petición.
-function requestInTransaction<T>(
+export function requestResult<T>(request: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("Error de IndexedDB"));
+  });
+}
+
+export function transactionDone(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(tx.error ?? new Error("Transacción cancelada"));
+    // El error de una petición provoca aborto por defecto; esperar ese estado final.
+  });
+}
+
+async function requestInTransaction<T>(
   db: IDBDatabase,
   storeName: string,
   mode: IDBTransactionMode,
   operation: (store: IDBObjectStore) => IDBRequest<T>
 ): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, mode);
-    const request = operation(tx.objectStore(storeName));
-    let result: T;
-    request.onsuccess = () => { result = request.result; };
-    tx.oncomplete = () => resolve(result);
-    tx.onabort = () => reject(tx.error ?? new Error("Transacción cancelada"));
-    tx.onerror = () => reject(tx.error);
-  });
+  const tx = db.transaction(storeName, mode);
+  const done = transactionDone(tx);
+  try {
+    const [result] = await Promise.all([requestResult(operation(tx.objectStore(storeName))), done]);
+    return result;
+  } catch (error) {
+    try { tx.abort(); } catch { /* Ya finalizada. */ }
+    await done.catch(() => undefined);
+    throw error;
+  }
 }
 
 export class TaskStorage {
   private constructor(private readonly db: IDBDatabase) {}
 
-  static open(): Promise<TaskStorage> {
+  close(): void { this.db.close(); }
+
+  static open(onVersionChange?: () => void): Promise<TaskStorage> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 1);
+      let blocked = false;
+      const request = indexedDB.open(DB_NAME, 2);
       request.onupgradeneeded = (event) => {
         const db = request.result;
         if (event.oldVersion < 1) {
@@ -34,15 +52,28 @@ export class TaskStorage {
           tasks.createIndex("porPrioridad", "priority", { unique: false });
           db.createObjectStore("configuracion", { keyPath: "id" });
         }
+        if (event.oldVersion < 2) {
+          request.transaction!.objectStore("tareas").createIndex("porFecha", "createdAt");
+        }
       };
-      request.onsuccess = () => resolve(new TaskStorage(request.result));
+      request.onsuccess = () => {
+        if (blocked) { request.result.close(); return; }
+        request.result.onversionchange = () => {
+          request.result.close();
+          onVersionChange?.();
+        };
+        resolve(new TaskStorage(request.result));
+      };
       request.onerror = () => reject(request.error);
-      request.onblocked = () => reject(new Error("Cierra otras pestañas de la aplicación e inténtalo de nuevo."));
+      request.onblocked = () => {
+        blocked = true;
+        reject(new Error("Cierra otras pestañas de la aplicación y recarga."));
+      };
     });
   }
 
   getTasks(): Promise<Task[]> {
-    return requestInTransaction(this.db, "tareas", "readonly", (store) => store.getAll());
+    return requestInTransaction(this.db, "tareas", "readonly", (store) => store.index("porFecha").getAll());
   }
 
   addTask(task: Task): Promise<IDBValidKey> {
@@ -73,31 +104,40 @@ export class TaskStorage {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      return;
+      throw new Error("Los datos anteriores no son JSON válido; se conservaron sin modificar.");
     }
-    if (!Array.isArray(parsed)) return;
-
-    const existingIds = new Set((await this.getTasks()).map((task) => task.id));
-    const missing = parsed.filter(isValidLegacyTask).filter((task) => !existingIds.has(task.id));
-    if (missing.length > 0) {
-      await new Promise<void>((resolve, reject) => {
-        const tx = this.db.transaction("tareas", "readwrite");
-        const store = tx.objectStore("tareas");
-        missing.forEach((task) => store.put(task));
-        tx.oncomplete = () => resolve();
-        tx.onabort = () => reject(tx.error ?? new Error("Importación cancelada"));
-        tx.onerror = () => reject(tx.error);
-      });
+    if (!Array.isArray(parsed)) throw new Error("El formato anterior no es una lista; se conservó la copia.");
+    const tasks = parsed.map(normalizeLegacyTask);
+    if (tasks.some((task) => !task)) throw new Error("Hay tareas anteriores inválidas; se conservó la copia completa.");
+    const tx = this.db.transaction("tareas", "readwrite");
+    const done = transactionDone(tx);
+    try {
+      const store = tx.objectStore("tareas");
+      // Leer y escribir en la misma transacción evita carreras entre pestañas.
+      for (const task of tasks as Task[]) {
+        if (!(await requestResult(store.get(task.id)))) await requestResult(store.add(task));
+      }
+      await done;
+    } catch (error) {
+      try { tx.abort(); } catch { /* Ya abortada. */ }
+      await done.catch(() => undefined);
+      throw error;
     }
     // Borrar la copia antigua solo después de confirmar la escritura en IndexedDB.
     localStorage.removeItem(LEGACY_KEY);
   }
 }
 
-function isValidLegacyTask(value: unknown): value is Task {
-  if (typeof value !== "object" || value === null) return false;
+function normalizeLegacyTask(value: unknown): Task | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
   const task = value as Record<string, unknown>;
-  return typeof task.id === "string" && typeof task.title === "string" &&
-    typeof task.completed === "boolean" && typeof task.createdAt === "string" &&
-    (task.priority === "low" || task.priority === "medium" || task.priority === "high");
+  const title = task.title ?? task.titulo;
+  const completed = task.completed ?? task.completada;
+  const createdAt = task.createdAt ?? task.fechaCreacion;
+  const priorities: Record<string, Task["priority"]> = { baja: "low", media: "medium", alta: "high" };
+  const priority = task.priority ?? priorities[String(task.prioridad)];
+  if (typeof task.id !== "string" || !task.id || typeof title !== "string" ||
+    typeof completed !== "boolean" || typeof createdAt !== "string" || !Number.isFinite(Date.parse(createdAt)) ||
+    (priority !== "low" && priority !== "medium" && priority !== "high")) return undefined;
+  return { id: task.id, title, completed, createdAt, priority };
 }
