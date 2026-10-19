@@ -12,6 +12,10 @@ export interface Task {
 
 export interface EncryptionConfig {
   id: "encryption";
+  version?: 1;
+  iterations?: number;
+  kdf?: "PBKDF2-SHA256";
+  cipher?: "AES-GCM-256";
   salt: Uint8Array;
   verifierCiphertext: ArrayBuffer;
   verifierIv: Uint8Array;
