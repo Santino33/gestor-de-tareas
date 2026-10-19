@@ -1,6 +1,7 @@
 {
   "name": "Gestor de Tareas - Electiva PWA",
   "short_name": "Tareas",
+  "id": "/",
   "description": "Gestiona tus tareas, incluso sin conexión.",
   "start_url": "/index.html",
   "scope": "/",
@@ -24,14 +25,8 @@
       "purpose": "maskable"
     },
     {
-      "src": "icons/icon-96-incorrecto.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/the-snail.png",
-      "sizes": "256x256",
       "type": "image/png",
       "purpose": "any"
     }

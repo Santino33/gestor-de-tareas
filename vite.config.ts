@@ -5,11 +5,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         app: 'index.html',
-        sw: 'src/sw.ts',
       },
       output: {
-        entryFileNames: (chunkInfo): string =>
-          chunkInfo.name === 'sw' ? 'sw.js' : 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
       },
     },
   },
