@@ -1,6 +1,6 @@
 import { TaskService } from "./services/TaskService";
 import { TaskView } from "./views/TaskView";
-import { LocalStorageTaskStorage } from "./storage/TaskStorage";
+import { TaskStorage } from "./storage/TaskStorage";
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
@@ -15,7 +15,9 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
   });
 }
 
-const taskService = new TaskService(new LocalStorageTaskStorage());
-const taskView = new TaskView(taskService);
-
-taskView.initialize();
+TaskStorage.open()
+  .then((storage) => new TaskView(new TaskService(storage)).initialize())
+  .catch((error: unknown) => {
+    const message = document.querySelector("#message");
+    if (message) message.textContent = error instanceof Error ? error.message : "No se pudo abrir IndexedDB";
+  });

@@ -1,8 +1,9 @@
 import type { Task } from "../models/Task";
 
 interface TaskListViewCallbacks {
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
+  onToggle: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onReadNote: (id: string) => Promise<string>;
 }
 
 export class TaskListView {
@@ -19,7 +20,7 @@ export class TaskListView {
 
   private createTaskElement(
     task: Task,
-    { onToggle, onDelete }: TaskListViewCallbacks
+    { onToggle, onDelete, onReadNote }: TaskListViewCallbacks
   ): HTMLLIElement {
     const listItem = document.createElement("li");
 
@@ -38,11 +39,38 @@ export class TaskListView {
     text.textContent = task.title;
 
     const deleteButton = document.createElement("button");
-    deleteButton.textContent = "Delete";
+    deleteButton.textContent = "Eliminar";
     deleteButton.className = "delete-button";
     deleteButton.addEventListener("click", () => onDelete(task.id));
 
-    listItem.append(checkbox, text, deleteButton);
+    listItem.append(checkbox, text);
+    if (task.noteCiphertext) {
+      const noteButton = document.createElement("button");
+      noteButton.type = "button";
+      noteButton.textContent = "Ver nota";
+      noteButton.className = "note-button";
+      const note = document.createElement("p");
+      note.className = "private-note";
+      note.hidden = true;
+      noteButton.addEventListener("click", async () => {
+        if (!note.hidden) {
+          note.hidden = true;
+          note.textContent = "";
+          noteButton.textContent = "Ver nota";
+          return;
+        }
+        try {
+          note.textContent = await onReadNote(task.id);
+          note.hidden = false;
+          noteButton.textContent = "Ocultar nota";
+        } catch {
+          note.textContent = "No se pudo descifrar la nota.";
+          note.hidden = false;
+        }
+      });
+      listItem.append(noteButton, note);
+    }
+    listItem.append(deleteButton);
     return listItem;
   }
 }

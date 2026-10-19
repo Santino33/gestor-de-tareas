@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gestor-tareas-v1';
+const CACHE_NAME = 'gestor-tareas-v2';
 const CORE_ASSETS = ['/', '/index.html', '/manifest.json'];
 
 const swScope = self as unknown as ServiceWorkerGlobalScope;
@@ -10,7 +10,13 @@ swScope.addEventListener('install', (event: ExtendableEvent) => {
 });
 
 swScope.addEventListener('activate', (event: ExtendableEvent) => {
-  event.waitUntil(swScope.clients.claim());
+  event.waitUntil(
+    caches.keys().then(async (names) => {
+      await Promise.all(names.filter((name) => name.startsWith('gestor-tareas-v') && name !== CACHE_NAME)
+        .map((name) => caches.delete(name)));
+      await swScope.clients.claim();
+    })
+  );
 });
 
 swScope.addEventListener('fetch', (event: FetchEvent) => {
