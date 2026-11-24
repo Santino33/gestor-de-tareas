@@ -1,5 +1,59 @@
 # Evidencia de la iteración
 
+## Adaptación de Atlas 3D
+
+Fecha: 2026-11-24. Entorno: Linux, Node 24.18.0, npm 11.16.0,
+Chrome 156.0.8078.79, Lighthouse 13.5.0 y Playwright 1.64.1.
+Alcance: [plan de adaptación](plan-adaptacion-atlas-3d.md).
+
+La línea base compiló con **6 URL y 35,8 kB de precaché** y pasó **11 pruebas**.
+El build final conserva las **6 URL**, con **37,6 kB**, y pasó **25 pruebas**.
+La prueba de borrador pasó en Chrome y Firefox antes del cambio: filtrar,
+completar otra tarea o provocar un aborto de escritura no limpia título, nota
+ni prioridad. El formulario sí se limpia tras guardar con éxito. Por eso
+no se modificaron la vista, IndexedDB ni el cifrado.
+
+| Comprobación de la adaptación | Evidencia automatizada |
+|---|---|
+| Servidor disponible; recuperación de red; rechazo de HTTP 503, HTML y vencimiento tras 3 s; una respuesta anterior no cambia el aviso vigente | `tests/ux.spec.ts`, Chrome y Firefox |
+| Crear y completar tareas aunque falle la comprobación; `/red.txt` queda fuera de Cache Storage | `tests/ux.spec.ts`, `tests/offline.spec.ts`, Chrome y Firefox |
+| Prompt nativo disponible en perfil normal de Chrome; aplazamiento de 7 días y expiración, confirmación y guía iOS con eventos controlados | `tests/install.spec.ts`, `tests/ux.spec.ts` |
+| Migración legada sin duplicados después de recargar; esquema v1→v2 y cifrado compatibles | `tests/ux.spec.ts`, `tests/storage.spec.ts`, `tests/crypto.spec.ts` |
+| Primera recarga offline con precaché, escritura y lectura de nota cifrada | `tests/offline.spec.ts`, Chrome y Firefox |
+| SW real en espera: cancelar conserva el borrador, confirmar activa la actualización, y la nota guardada sigue disponible | `tests/update.spec.ts`, Chrome |
+
+La sugerencia de instalación se inspeccionó a 375 × 812, 812 × 375 y
+1440 × 900: sin desbordamiento horizontal, con botones de 44 px de alto y
+aplazamiento por teclado. Son tamaños emulados, no dispositivos físicos.
+
+### Lighthouse móvil: antes y después
+
+Tres corridas en frío por build en `http://127.0.0.1:4173/`, con Chrome
+headless y la misma configuración de Lighthouse. Se muestran medianas.
+
+| Build | Rendimiento | Accesibilidad | Buenas prácticas | SEO | FCP | LCP | TBT | CLS |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Base | 100 | 100 | 100 | 100 | 964 ms | 964 ms | 0 ms | 0,023 |
+| Final | 100 | 100 | 100 | 100 | 981 ms | 1474 ms | 0 ms | 0,003 |
+
+La primera tanda posterior al cambio detectó desplazamientos del formulario
+al aparecer los controles de instalación. Reservar espacio para el aviso redujo
+el CLS en el build final. El LCP medido subió: el candidato pasó del texto
+estático de ayuda al rótulo del formulario, que aparece al abrir IndexedDB.
+El FCP se mantuvo cerca de 1 s y el LCP final quedó en 1,47 s en este entorno
+simulado; no se cambió el flujo de desbloqueo para optimizar la puntuación.
+Los informes JSON/HTML son locales: `reports/atlas-base-{1,2,3}.report.*`
+y `reports/atlas-final-{1,2,3}.report.*`.
+
+**Pendiente manual:** no se dispuso de un teléfono para instalar mediante
+Safari/iOS o Chromium, cerrar la app, activar modo avión y reabrir para
+desbloquear una nota. Los eventos de instalación simulados y el diagnóstico
+de instalabilidad de Chrome no sustituyen esta comprobación. Para realizarla,
+servir por HTTPS, esperar a que se prepare el modo offline y guardar una tarea
+con nota antes de cortar la conexión.
+
+## Validación anterior
+
 Fecha: 2026-10-19. Entorno: Linux, Node 24.18.0, npm 11.16.0,
 Chrome 155.0.8059.84, Lighthouse 13.5.0, Playwright 1.64.1.
 

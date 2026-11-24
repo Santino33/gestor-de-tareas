@@ -1,48 +1,12 @@
 import { Workbox } from "workbox-window";
-
-interface InstallPrompt extends Event {
-  prompt(): Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
+import { monitorConnectivity } from "./connectivity";
+import { initializeInstall } from "./install";
 
 export function initializePwa(): void {
-  const connectivity = document.querySelector<HTMLElement>("#connectivity")!;
-  const install = document.querySelector<HTMLButtonElement>("#install")!;
-  const help = document.querySelector<HTMLElement>("#install-help")!;
+  monitorConnectivity(document.querySelector<HTMLElement>("#connectivity")!);
+  initializeInstall();
   const status = document.querySelector<HTMLElement>("#pwa-status")!;
   const update = document.querySelector<HTMLButtonElement>("#update")!;
-  const connectionChanged = (): void => {
-    connectivity.textContent = navigator.onLine
-      ? "Red disponible según el dispositivo (no garantiza acceso a Internet)."
-      : "Sin conexión: tus tareas se guardan en este dispositivo.";
-  };
-  connectionChanged();
-  window.addEventListener("online", connectionChanged);
-  window.addEventListener("offline", connectionChanged);
-  let prompt: InstallPrompt | undefined;
-  const standalone = matchMedia("(display-mode: standalone)");
-  const installed = (): void => { prompt = undefined; install.hidden = true; help.hidden = true; };
-  if (standalone.matches) installed();
-  standalone.addEventListener("change", () => { if (standalone.matches) installed(); });
-  window.addEventListener("beforeinstallprompt", (event) => {
-    event.preventDefault();
-    prompt = event as InstallPrompt;
-    install.hidden = false;
-    help.hidden = true;
-  });
-  window.addEventListener("appinstalled", installed);
-  install.addEventListener("click", async () => {
-    if (!prompt) return;
-    const current = prompt;
-    prompt = undefined;
-    install.disabled = true;
-    try {
-      await current.prompt();
-      const choice = await current.userChoice;
-      status.textContent = choice.outcome === "accepted" ? "Instalación solicitada." : "Puedes instalar más tarde desde el menú del navegador.";
-    } catch { status.textContent = "No se pudo abrir la instalación. Usa el menú del navegador."; }
-    finally { install.hidden = true; install.disabled = false; }
-  });
 
   if (!("serviceWorker" in navigator) || !import.meta.env.PROD) return;
   const wb = new Workbox("/sw.js");

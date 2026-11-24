@@ -143,6 +143,12 @@ button:disabled { opacity: .6; cursor: wait; }
 :focus-visible { outline: 3px solid #315fa3; outline-offset: 3px; }
 .task-form label { flex-basis: 100%; }
 .task-filters { margin-bottom: 1rem; }
-.task-filters p, #install-help, #connectivity, #pwa-status { font-size: .85rem; }
+.task-filters p, #install-help, #install-status, #connectivity, #pwa-status { font-size: .85rem; }
+.install-offer { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-height: 44px; }
+.install-offer p { margin: 0; }
+#install-help { flex: 1 1 10rem; }
+#install-status:not(:empty) { flex-basis: 100%; }
+#install-status:empty { flex-basis: 0; }
+#pwa-status { min-height: 1lh; }
 .task span { overflow-wrap: anywhere; min-width: 0; }
 @media (max-width: 600px) { .app { margin: 1rem .5rem; padding: 1rem; } }

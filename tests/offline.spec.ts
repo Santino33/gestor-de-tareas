@@ -8,16 +8,25 @@ test('precache completo permite primera recarga offline y dos rutas runtime real
     await fetch('/manifest.json');
   });
   await page.reload();
+  await expect(page.locator('#connectivity')).toHaveText('El servidor del gestor responde.');
   await expect.poll(() => page.evaluate(async () => {
     const manifest = await caches.open('gestor-manifest');
     const pages = await caches.open('gestor-navigation');
     const navigation = await caches.keys();
     return (await manifest.keys()).length > 0 && (await pages.keys()).length > 0 && navigation.some(key => key.includes('precache'));
   })).toBe(true);
+  expect(await page.evaluate(async () => {
+    for (const name of await caches.keys()) {
+      const entries = await (await caches.open(name)).keys();
+      if (entries.some(entry => new URL(entry.url).pathname === '/red.txt')) return true;
+    }
+    return false;
+  })).toBe(false);
   // Fuerza la reserva precargada, sin depender del HTML cacheado en runtime.
   await page.evaluate(() => caches.delete('gestor-navigation'));
   await context.setOffline(true);
   await page.reload();
+  await expect(page.locator('#connectivity')).toContainText('Sin conexión');
   await expect(page.locator('#password-form')).toBeVisible();
   await page.locator('#password-input').fill('contraseña offline');
   await page.locator('#password-confirm').fill('contraseña offline');

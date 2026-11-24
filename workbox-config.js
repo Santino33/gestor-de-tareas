@@ -12,6 +12,7 @@ export const inlineWorkboxRuntime = true;
 export const importScripts = ['sw-cleanup.js'];
 // /index.html es la reserva precargada; / usa la ruta de navegación runtime.
 export const directoryIndex = null;
+// /red.txt se verifica directamente en red: no agregar al precaché ni a rutas runtime.
 export const runtimeCaching = [
   {
     urlPattern: ({ request, url }) => request.mode === 'navigate' && url.origin === self.location.origin,

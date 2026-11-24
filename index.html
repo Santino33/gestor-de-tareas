@@ -17,9 +17,13 @@
     <h1>Gestor de tareas</h1>
     <p class="subtitle">Tus tareas y notas privadas, incluso sin conexión.</p>
     <aside aria-label="Estado de la aplicación">
-      <p id="connectivity" role="status"></p>
-      <button type="button" id="install" hidden>Instalar aplicación</button>
-      <p id="install-help">Para instalar, busca «Instalar» en el menú del navegador. En iPhone/iPad: Compartir → Añadir a pantalla de inicio, si está disponible.</p>
+      <p id="connectivity" role="status">Comprobando si responde el servidor…</p>
+      <div class="install-offer">
+        <p id="install-help">Instala desde el menú si está disponible.</p>
+        <button type="button" id="install" hidden>Instalar aplicación</button>
+        <button type="button" id="install-dismiss" hidden>Ahora no</button>
+        <p id="install-status" role="status" tabindex="-1"></p>
+      </div>
       <p id="pwa-status" role="status"></p>
       <button type="button" id="update" hidden>Actualizar aplicación</button>
     </aside>

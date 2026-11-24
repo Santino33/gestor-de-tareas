@@ -35,8 +35,9 @@ Abrir `http://127.0.0.1:4173/`. El SW se registra solamente en producción. Serv
 - Completar todas las pendientes de la prioridad elegida mediante cursor IndexedDB.
 - Notas opcionales cifradas antes de persistir; contraseña al iniciar, descifrado bajo demanda.
 - Importación del formato legado español de `localStorage`, sin sobrescribir IDs existentes.
-- Conectividad orientativa, mensajes de carga/éxito/error y bloqueo durante operaciones.
-- Instalación cuando el navegador emite `beforeinstallprompt`; instrucciones alternativas.
+- Al iniciar o recuperar la red, el gestor comprueba si responde su propio servidor. La comprobación no bloquea tareas ni indica si Internet funciona en general.
+- Instalación cuando el navegador emite `beforeinstallprompt`; ayuda manual si no hay diálogo nativo (en Safari/iOS: **Compartir → Añadir a pantalla de inicio**). **Ahora no** oculta la sugerencia durante siete días en ese navegador sin impedir instalar desde el menú.
+- El título, la nota privada y la prioridad del borrador se conservan al filtrar, completar otra tarea o fallar el guardado. El borrador permanece en memoria: una recarga no recupera texto sin guardar.
 - Aviso de actualización con consentimiento y comprobación de formularios sin guardar.
 
 Los datos son locales al origen y perfil del navegador: no hay backend ni sincronización remota. La contraseña y la clave derivada no se guardan. Perder la contraseña impide recuperar las notas; eliminar los datos del sitio elimina también tareas y sal. El cifrado de almacenamiento no protege una sesión ya desbloqueada.
@@ -48,7 +49,8 @@ Los datos son locales al origen y perfil del navegador: no hay backend ni sincro
 - `src/services/TaskService.ts`: operaciones y estado de lista.
 - `src/services/NoteCrypto.ts`: PBKDF2 y AES-GCM.
 - `src/views/`: DOM, formularios y acciones de tareas.
-- `src/pwa.ts`: conectividad, instalación y `workbox-window`.
+- `src/pwa.ts`: registro, avisos y actualización consentida con `workbox-window`.
+- `src/connectivity.ts` y `src/install.ts`: comprobación del servidor y sugerencias de instalación.
 - `workbox-config.js`: configuración ESM leída directamente por el CLI con Node >=22.12; exportaciones nombradas, sin `default`.
 - `public/sw-cleanup.js`: complemento JavaScript de activación; no añade rutas ni `fetch`.
 - `app.js`, `tareas.js`, `referencia-typescript/`: referencia histórica, no se cargan en la aplicación activa.
@@ -68,6 +70,7 @@ La terminal informa la cantidad de URL y kB: conservar esa salida para cada entr
 | `index.html`, bundles JS/CSS con hash, iconos 192/512/maskable | Precache revisionado; se descarga al instalar SW |
 | Navegaciones no resueltas por precache (por ejemplo `/`) | NetworkFirst; 3 s de timeout, 5 entradas, 1 día; fallback al `index.html` precargado |
 | `/manifest.json` | StaleWhileRevalidate; 1 entrada, 7 días; petición explícita al obtener control del SW |
+| `/red.txt` | Petición directa sin caché del navegador ni del SW, con plazo de 3 s; nunca contiene datos del usuario |
 
 GenerateSW incluye `workbox-precaching`, `workbox-routing`, `workbox-strategies`, `workbox-expiration` y sus plugins según estas opciones. Las dos reglas runtime están verificadas con peticiones reales. El manifiesto **no es parte del precache**; queda disponible offline después de esa petición controlada. `sw-cleanup.js` se descarga como dependencia del worker. Ni tareas ni notas pasan por Cache Storage. Solo se eliminan cachés del esquema manual `gestor-tareas-vN`, no IndexedDB ni cachés de otras aplicaciones.
 
@@ -91,4 +94,4 @@ npx playwright install webkit
 TEST_WEBKIT=1 npm test -- --project=webkit
 ```
 
-Resultados, limitaciones y verificaciones manuales pendientes: [docs/validacion-iteracion.md](docs/validacion-iteracion.md).
+Resultados, limitaciones y verificaciones manuales pendientes: [evidencia de validación](docs/validacion-iteracion.md). Alcance y criterios: [plan de adaptación de Atlas 3D](docs/plan-adaptacion-atlas-3d.md).
